@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Oscilloscope</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .oscilloscope-container {
+            background: rgba(20, 20, 30, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 1400px;
+            width: 100%;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        h1 {
+            color: #fff;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
+        }
+
+        .displays {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .display-section {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(102, 126, 234, 0.3);
+        }
+
+        .display-title {
+            color: #667eea;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 300px;
+            background: #000;
+            border-radius: 10px;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .control-group {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        label {
+            color: #aaa;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        select, input[type="range"], input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(102, 126, 234, 0.5);
+            border-radius: 5px;
+            color: #fff;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 8px;
+            background: rgba(102, 126, 234, 0.3);
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #667eea;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+            transition: all 0.3s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.8);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.stop {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .info-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .info-item {
+            text-align: center;
+        }
+
+        .info-label {
+            color: #888;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            color: #667eea;
+            font-size: 1.2em;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.8; }
+            50% { opacity: 1; }
+            100% { opacity: 0.8; }
+        }
+
+        .recording {
+            animation: pulse 1.5s infinite;
+        }
+
+        .filter-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: rgba(102, 126, 234, 0.3);
+            border-radius: 20px;
+            color: #fff;
+            font-size: 0.85em;
+            margin-left: 10px;
+            border: 1px solid rgba(102, 126, 234, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="oscilloscope-container">
+        <h1>🔬 Virtual Oscilloscope</h1>
+        
+        <div class="displays">
+            <div class="display-section">
+                <div class="display-title">
+                    Time Domain
+                    <span id="filterBadge" class="filter-badge" style="display: none;"></span>
+                </div>
+                <canvas id="timeCanvas"></canvas>
+            </div>
+            <div class="display-section">
+                <div class="display-title">Frequency Domain (FFT)</div>
+                <canvas id="freqCanvas"></canvas>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="waveform">Waveform Type</label>
+                <select id="waveform">
+                    <option value="sine">Sine Wave</option>
+                    <option value="square">Square Wave</option>
+                    <option value="triangle">Triangle Wave</option>
+                    <option value="sawtooth">Sawtooth Wave</option>
+                    <option value="noise">White Noise</option>
+                    <option value="composite">Composite (Multi-frequency)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="frequency">Frequency: <span id="freqValue">440</span> Hz</label>
+                <input type="range" id="frequency" min="20" max="2000" value="440" step="1">
+            </div>
+
+            <div class="control-group">
+                <label for="amplitude">Amplitude: <span id="ampValue">0.5</span></label>
+                <input type="range" id="amplitude" min="0" max="1" value="0.5" step="0.01">
+            </div>
+
+            <div class="control-group">
+                <label for="sampleRate">Sample Rate</label>
+                <select id="sampleRate">
+                    <option value="8000">8 kHz</option>
+                    <option value="16000">16 kHz</option>
+                    <option value="44100" selected>44.1 kHz</option>
+                    <option value="48000">48 kHz</option>
+                    <option value="96000">96 kHz</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="filter">Filter Type</label>
+                <select id="filter">
+                    <option value="none">None</option>
+                    <option value="lowpass">Low Pass</option>
+                    <option value="highpass">High Pass</option>
+                    <option value="bandpass">Band Pass</option>
+                    <option value="notch">Notch</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="cutoff">Filter Cutoff: <span id="cutoffValue">1000</span> Hz</label>
+                <input type="range" id="cutoff" min="20" max="20000" value="1000" step="10">
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button id="startBtn">▶️ Start</button>
+            <button id="stopBtn" class="stop">⏹️ Stop</button>
+            <button id="freezeBtn">❄️ Freeze</button>
+            <button id="exportBtn">💾 Export Data</button>
+        </div>
+
+        <div class="info-panel">
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">Peak Frequency</div>
+                    <div class="info-value" id="peakFreq">0 Hz</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">RMS Amplitude</div>
+                    <div class="info-value" id="rmsAmp">0.00</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Peak-to-Peak</div>
+                    <div class="info-value" id="peakToPeak">0.00</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">DC Offset</div>
+                    <div class="info-value" id="dcOffset">0.00</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class VirtualOscilloscope {
+            constructor() {
+                this.timeCanvas = document.getElementById('timeCanvas');
+                this.freqCanvas = document.getElementById('freqCanvas');
+                this.timeCtx = this.timeCanvas.getContext('2d');
+                this.freqCtx = this.freqCanvas.getContext('2d');
+                
+                this.isRunning = false;
+                this.isFrozen = false;
+                this.sampleRate = 44100;
+                this.bufferSize = 2048;
+                this.timeData = new Float32Array(this.bufferSize);
+                this.freqData = new Float32Array(this.bufferSize / 2);
+                
+                this.setupCanvas();
+                this.setupControls();
+                this.animationId = null;
+            }
+
+            setupCanvas() {
+                const resizeCanvas = () => {
+                    const rect = this.timeCanvas.getBoundingClientRect();
+                    this.timeCanvas.width = rect.width * window.devicePixelRatio;
+                    this.timeCanvas.height = rect.height * window.devicePixelRatio;
+                    this.freqCanvas.width = rect.width * window.devicePixelRatio;
+                    this.freqCanvas.height = rect.height * window.devicePixelRatio;
+                    
+                    this.timeCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+                    this.freqCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+                };
+                
+                resizeCanvas();
+                window.addEventListener('resize', resizeCanvas);
+            }
+
+            setupControls() {
+                // Waveform controls
+                document.getElementById('frequency').addEventListener('input', (e) => {
+                    document.getElementById('freqValue').textContent = e.target.value;
+                });
+                
+                document.getElementById('amplitude').addEventListener('input', (e) => {
+                    document.getElementById('ampValue').textContent = e.target.value;
+                });
+                
+                document.getElementById('cutoff').addEventListener('input', (e) => {
+                    document.getElementById('cutoffValue').textContent = e.target.value;
+                });
+                
+                document.getElementById('sampleRate').addEventListener('change', (e) => {
+                    this.sampleRate = parseInt(e.target.value);
+                });
+                
+                document.getElementById('filter').addEventListener('change', (e) => {
+                    const filterBadge = document.getElementById('filterBadge');
+                    if (e.target.value !== 'none') {
+                        filterBadge.style.display = 'inline-block';
+                        filterBadge.textContent = e.target.value.toUpperCase();
+                    } else {
+                        filterBadge.style.display = 'none';
+                    }
+                });
+                
+                // Button controls
+                document.getElementById('startBtn').addEventListener('click', () => this.start());
+                document.getElementById('stopBtn').addEventListener('click', () => this.stop());
+                document.getElementById('freezeBtn').addEventListener('click', () => this.toggleFreeze());
+                document.getElementById('exportBtn').addEventListener('click', () => this.exportData());
+            }
+
+            generateWaveform(type, frequency, amplitude, phase = 0) {
+                const samples = this.timeData.length;
+                const data = new Float32Array(samples);
+                
+                for (let i = 0; i < samples; i++) {
+                    const t = i / this.sampleRate;
+                    const omega = 2 * Math.PI * frequency;
+                    
+                    switch(type) {
+                        case 'sine':
+                            data[i] = amplitude * Math.sin(omega * t + phase);
+                            break;
+                        case 'square':
+                            data[i] = amplitude * Math.sign(Math.sin(omega * t + phase));
+                            break;
+                        case 'triangle':
+                            const period = 1 / frequency;
+                            const normalizedTime = (t % period) / period;
+                            data[i] = amplitude * (4 * Math.abs(normalizedTime - 0.5) - 1);
+                            break;
+                        case 'sawtooth':
+                            data[i] = amplitude * (2 * ((frequency * t) % 1) - 1);
+                            break;
+                        case 'noise':
+                            data[i] = amplitude * (Math.random() * 2 - 1);
+                            break;
+                        case 'composite':
+                            data[i] = amplitude * (
+                                0.5 * Math.sin(omega * t) +
+                                0.3 * Math.sin(2 * omega * t) +
+                                0.2 * Math.sin(3 * omega * t)
+                            );
+                            break;
+                    }
+                }
+                
+                return data;
+            }
+
+            applyFilter(data, filterType, cutoff) {
+                if (filterType === 'none') return data;
+                
+                const filtered = new Float32Array(data.length);
+                const rc = 1 / (2 * Math.PI * cutoff);
+                const dt = 1 / this.sampleRate;
+                const alpha = dt / (rc + dt);
+                
+                switch(filterType) {
+                    case 'lowpass':
+                        filtered[0] = data[0];
+                        for (let i = 1; i < data.length; i++) {
+                            filtered[i] = filtered[i-1] + alpha * (data[i] - filtered[i-1]);
+                        }
+                        break;
+                    case 'highpass':
+                        filtered[0] = data[0];
+                        for (let i = 1; i < data.length; i++) {
+                            filtered[i] = alpha * (filtered[i-1] + data[i] - data[i-1]);
+                        }
+                        break;
+                    case 'bandpass':
+                        // Simple band-pass using cascaded high-pass and low-pass
+                        const temp = new Float32Array(data.length);
+                        temp[0] = data[0];
+                        // High-pass stage
+                        for (let i = 1; i < data.length; i++) {
+                            temp[i] = alpha * (temp[i-1] + data[i] - data[i-1]);
+                        }
+                        // Low-pass stage
+                        filtered[0] = temp[0];
+                        for (let i = 1; i < data.length; i++) {
+                            filtered[i] = filtered[i-1] + alpha * (temp[i] - filtered[i-1]);
+                        }
+                        break;
+                    case 'notch':
+                        // Simple notch filter (inverse of band-pass)
+                        const bandpass = this.applyFilter(data, 'bandpass', cutoff);
+                        for (let i = 0; i < data.length; i++) {
+                            filtered[i] = data[i] - bandpass[i];
+                        }
+                        break;
+                    default:
+                        return data;
+                }
+                
+                return filtered;
+            }
+
+            computeFFT(data) {
+                const N = data.length;
+                const fft = new Float32Array(N / 2);
+                
+                for (let k = 0; k < N / 2; k++) {
+                    let real = 0;
+                    let imag = 0;
+                    
+                    for (let n = 0; n < N; n++) {
+                        const angle = -2 * Math.PI * k * n / N;
+                        real += data[n] * Math.cos(angle);
+                        imag += data[n] * Math.sin(angle);
+                    }
+                    
+                    fft[k] = Math.sqrt(real * real + imag * imag) / N;
+                }
+                
+                return fft;
+            }
+
+            calculateStats() {
+                // RMS Amplitude
+                let sumSquares = 0;
+                let max = -Infinity;
+                let min = Infinity;
+                let sum = 0;
+                
+                for (let i = 0; i < this.timeData.length; i++) {
+                    sumSquares += this.timeData[i] * this.timeData[i];
+                    max = Math.max(max, this.timeData[i]);
+                    min = Math.min(min, this.timeData[i]);
+                    sum += this.timeData[i];
+                }
+                
+                const rms = Math.sqrt(sumSquares / this.timeData.length);
+                const peakToPeak = max - min;
+                const dcOffset = sum / this.timeData.length;
+                
+                // Peak frequency
+                let maxMag = 0;
+                let peakFreqIndex = 0;
+                for (let i = 1; i < this.freqData.length; i++) {
+                    if (this.freqData[i] > maxMag) {
+                        maxMag = this.freqData[i];
+                        peakFreqIndex = i;
+                    }
+                }
+                const peakFreq = (peakFreqIndex * this.sampleRate) / (2 * this.freqData.length);
+                
+                // Update display
+                document.getElementById('peakFreq').textContent = `${Math.round(peakFreq)} Hz`;
+                document.getElementById('rmsAmp').textContent = rms.toFixed(3);
+                document.getElementById('peakToPeak').textContent = peakToPeak.toFixed(3);
+                document.getElementById('dcOffset').textContent = dcOffset.toFixed(3);
+            }
+
+            drawTimeDomain() {
+                const width = this.timeCanvas.width / window.devicePixelRatio;
+                const height = this.timeCanvas.height / window.devicePixelRatio;
+                
+                this.timeCtx.fillStyle = '#000';
+                this.timeCtx.fillRect(0, 0, width, height);
+                
+                // Draw grid
+                this.timeCtx.strokeStyle = 'rgba(102, 126, 234, 0.2)';
+                this.timeCtx.lineWidth = 0.5;
+                
+                for (let i = 0; i <= 10; i++) {
+                    const y = (height / 10) * i;
+                    this.timeCtx.beginPath();
+                    this.timeCtx.moveTo(0, y);
+                    this.timeCtx.lineTo(width, y);
+                    this.timeCtx.stroke();
+                    
+                    const x = (width / 10) * i;
+                    this.timeCtx.beginPath();
+                    this.timeCtx.moveTo(x, 0);
+                    this.timeCtx.lineTo(x, height);
+                    this.timeCtx.stroke();
+                }
+                
+                // Draw center line
+                this.timeCtx.strokeStyle = 'rgba(102, 126, 234, 0.5)';
+                this.timeCtx.lineWidth = 1;
+                this.timeCtx.beginPath();
+                this.timeCtx.moveTo(0, height / 2);
+                this.timeCtx.lineTo(width, height / 2);
+                this.timeCtx.stroke();
+                
+                // Draw waveform
+                this.timeCtx.strokeStyle = '#00ff88';
+                this.timeCtx.lineWidth = 2;
+                this.timeCtx.shadowBlur = 10;
+                this.timeCtx.shadowColor = '#00ff88';
+                
+                this.timeCtx.beginPath();
+                const sliceWidth = width / this.timeData.length;
+                let x = 0;
+                
+                for (let i = 0; i < this.timeData.length; i++) {
+                    const y = height / 2 - (this.timeData[i] * height / 2);
+                    
+                    if (i === 0) {
+                        this.timeCtx.moveTo(x, y);
+                    } else {
+                        this.timeCtx.lineTo(x, y);
+                    }
+                    
+                    x += sliceWidth;
+                }
+                
+                this.timeCtx.stroke();
+                this.timeCtx.shadowBlur = 0;
+            }
+
+            drawFrequencyDomain() {
+                const width = this.freqCanvas.width / window.devicePixelRatio;
+                const height = this.freqCanvas.height / window.devicePixelRatio;
+                
+                this.freqCtx.fillStyle = '#000';
+                this.freqCtx.fillRect(0, 0, width, height);
+                
+                // Draw grid
+                this.freqCtx.strokeStyle = 'rgba(102, 126, 234, 0.2)';
+                this.freqCtx.lineWidth = 0.5;
+                
+                for (let i = 0; i <= 10; i++) {
+                    const y = (height / 10) * i;
+                    this.freqCtx.beginPath();
+                    this.freqCtx.moveTo(0, y);
+                    this.freqCtx.lineTo(width, y);
+                    this.freqCtx.stroke();
+                    
+                    const x = (width / 10) * i;
+                    this.freqCtx.beginPath();
+                    this.freqCtx.moveTo(x, 0);
+                    this.freqCtx.lineTo(x, height);
+                    this.freqCtx.stroke();
+                }
+                
+                // Draw frequency bars
+                const barWidth = width / this.freqData.length;
+                const gradient = this.freqCtx.createLinearGradient(0, height, 0, 0);
+                gradient.addColorStop(0, '#764ba2');
+                gradient.addColorStop(1, '#667eea');
+                
+                this.freqCtx.fillStyle = gradient;
+                this.freqCtx.shadowBlur = 10;
+                this.freqCtx.shadowColor = '#667eea';
+                
+                for (let i = 0; i < this.freqData.length; i++) {
+                    const barHeight = this.freqData[i] * height * 2;
+                    const x = i * barWidth;
+                    const y = height - barHeight;
+                    
+                    this.freqCtx.fillRect(x, y, barWidth - 1, barHeight);
+                }
+                
+                this.freqCtx.shadowBlur = 0;
+                
+                // Draw frequency labels
+                this.freqCtx.fillStyle = '#888';
+                this.freqCtx.font = '10px monospace';
+                const nyquist = this.sampleRate / 2;
+                for (let i = 0; i <= 5; i++) {
+                    const freq = (nyquist / 5) * i;
+                    const x = (width / 5) * i;
+                    this.freqCtx.fillText(`${Math.round(freq)}Hz`, x + 5, height - 5);
+                }
+            }
+
+            animate() {
+                if (!this.isRunning) return;
+                
+                if (!this.isFrozen) {
+                    // Get current parameters
+                    const waveform = document.getElementById('waveform').value;
+                    const frequency = parseFloat(document.getElementById('frequency').value);
+                    const amplitude = parseFloat(document.getElementById('amplitude').value);
+                    const filterType = document.getElementById('filter').value;
+                    const cutoff = parseFloat(document.getElementById('cutoff').value);
+                    
+                    // Generate and process waveform
+                    const rawData = this.generateWaveform(waveform, frequency, amplitude, Date.now() * 0.001);
+                    this.timeData = this.applyFilter(rawData, filterType, cutoff);
+                    this.freqData = this.computeFFT(this.timeData);
+                    
+                    // Calculate statistics
+                    this.calculateStats();
+                }
+                
+                // Draw displays
+                this.drawTimeDomain();
+                this.drawFrequencyDomain();
+                
+                this.animationId = requestAnimationFrame(() => this.animate());
+            }
+
+            start() {
+                if (this.isRunning) return;
+                this.isRunning = true;
+                this.isFrozen = false;
+                document.getElementById('startBtn').textContent = '⏸️ Pause';
+                this.animate();
+            }
+
+            stop() {
+                this.isRunning = false;
+                this.isFrozen = false;
+                if (this.animationId) {
+                    cancelAnimationFrame(this.animationId);
+                }
+                document.getElementById('startBtn').textContent = '▶️ Start';
+                
+                // Clear displays
+                const width = this.timeCanvas.width / window.devicePixelRatio;
+                const height = this.timeCanvas.height / window.devicePixelRatio;
+                this.timeCtx.fillStyle = '#000';
+                this.timeCtx.fillRect(0, 0, width, height);
+                this.freqCtx.fillStyle = '#000';
+                this.freqCtx.fillRect(0, 0, width, height);
+            }
+
+            toggleFreeze() {
+                this.isFrozen = !this.isFrozen;
+                document.getElementById('freezeBtn').textContent = this.isFrozen ? '🔥 Unfreeze' : '❄️ Freeze';
+            }
+
+            exportData() {
+                const data = {
+                    timestamp: new Date().toISOString(),
+                    settings: {
+                        waveform: document.getElementById('waveform').value,
+                        frequency: parseFloat(document.getElementById('frequency').value),
+                        amplitude: parseFloat(document.getElementById('amplitude').value),
+                        sampleRate: this.sampleRate,
+                        filter: document.getElementById('filter').value,
+                        cutoff: parseFloat(document.getElementById('cutoff').value)
+                    },
+                    timeData: Array.from(this.timeData),
+                    frequencyData: Array.from(this.freqData),
+                    statistics: {
+                        peakFrequency: document.getElementById('peakFreq').textContent,
+                        rmsAmplitude: document.getElementById('rmsAmp').textContent,
+                        peakToPeak: document.getElementById('peakToPeak').textContent,
+                        dcOffset: document.getElementById('dcOffset').textContent
+                    }
+                };
+                
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `oscilloscope_data_${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+        }
+
+        // Initialize oscilloscope
+        const oscilloscope = new VirtualOscilloscope();
+    </script>
+</body>
+</html>
